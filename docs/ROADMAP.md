@@ -85,16 +85,16 @@ fly_kingo/
 - Shiu reposunun ve FlyWire verisinin lisansını kontrol et, `docs/LICENSES.md`'ye yaz.
 - **Bitti tanımı:** `conda activate fly_kingo` sonrası `python --version` 3.12, `pytest` yeşil, `docker compose up` ile DB ayakta, veri iniyor.
 
-### Faz 1: Sinek beynini ayağa kaldır · 2 hafta *(en riskli faz, ilk yapılmalı)*
-- `neurons.py`: şeker, su ve acı GRN ID'leri ile MN9 ID'si (Shiu makalesi ekleri + annotations).
-  - **Dikkat:** Shiu `example.ipynb`'deki ID'ler (21 sağ şeker GRN'i, MN9 = `720575940660219265`) FlyWire **v630** kök ID'leri. Proofreading sonrası kök ID'ler değişir. v783 karşılıkları `neuron_annotations.tsv` içindeki hücre tipi etiketleriyle (veya CAVE'in ID eşleme servisiyle) bulunmalı. Eşleşme sayıları test edilmeli.
-  - Faz 0 kontrolü (14 Ekim 2026): MN9 ID'si v783 `Completeness_783.csv` içinde **aynen var**. 21 şeker GRN ID'sinden **20'si** v783'te var, 1'inin yeni karşılığı bulunmalı. `neuron_annotations.tsv`'de `cell_type` alanı "MN9" içermiyor; MN9 başka bir etiketle geçiyor olabilir.
-- Colab'da Brian2 referansı: şeker → MN9 ateşlemesi, şeker+acı → MN9 baskılanması.
-- `lif_torch.py`: aynı model PyTorch'ta, CPU/GPU. Brian2 ile oran karşılaştırması (tolerans, örneğin ±%15).
-- Kalıcı testler: `test_sugar_mn9`, `test_bitter_suppresses`, `test_weights_frozen`.
-- CPU'da 1 sn sanal süre için süre ölçümü, günlük kapasite hesabı.
-- Colab notebook'u ile şeker×su×acı yüzeyi → `surface_v783.npz`, şeker×acı ısı haritası (README görseli).
-- **Bitti tanımı:** iki biyolojik test geçiyor, yüzey dosyası ve ısı haritası var, `simulate()` API'si belgelenmiş.
+### Faz 1: Sinek beynini ayağa kaldır · ✅ tamamlandı (14 Ekim 2026)
+Ayrıntılı sonuçlar: [BRAIN_VALIDATION.md](BRAIN_VALIDATION.md).
+- ✅ `neurons.py`: Shiu listeleri (v630). v783'te şeker 20/21, su 18/18, acı 20/21; MN9 aynen var. Karşı taraf MN9'un v783 karşılığı (CB0701) bulundu.
+- ✅ `lif_brian2.py`: Brian2 referansı (Colab gerekmedi; yerelde cython ile ~48 s/deneme).
+- ✅ `lif_torch.py`: PyTorch modeli. Deterministik girdide Brian2 ile **spike spike aynı**; tam beyinde korelasyon 0,999, MN9 89,7 / 89,8 Hz. Brian2'nin refrakter sürede sinaptik girdiyi yok sayma kuralı bulundu ve uygulandı.
+- ✅ Kalıcı testler: `test_sugar_activates_mn9`, `test_bitter_suppresses_sugar`, `test_water_activates_mn9`, `test_weights_unchanged_after_simulation` (`pytest -m slow`), ayrıca hızlı paket.
+- ✅ CPU performansı: 1,45 s/deneme (1 s sanal süre). İlan başına 5 denemelik tam simülasyon ≈ 7 s.
+- ✅ `api.py`: `FlyBrain.simulate()` / `simulate_batch()`; diğer katmanların beyne tek giriş noktası.
+- ✅ `surface.py`: şeker×su×acı yüzeyi (11×6×11 nokta, 5 deneme) CPU'da 81 dakikada hesaplandı. İnterpolasyon hatası ortalama 2,1 Hz (en büyük 6,0 Hz). `flyhire brain check-surface` interpolasyon hatasını ölçer, `flyhire brain heatmap` README görselini çizer.
+- **Plandan sapma:** Colab'a gerek kalmadı. PyTorch modeli CPU'da yeterince hızlı.
 
 ### Faz 2: İlan boru hattı · 1,5–2 hafta
 - Gmail iş alarmı okuyucusu (LinkedIn, Kariyer.net, Indeed alarmları), link ayıklama.

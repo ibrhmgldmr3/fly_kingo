@@ -6,7 +6,22 @@
 kararı ise FlyWire connectome'u üzerinde çalışan Shiu LIF modelinde **MN9 hortum motor nöronunun**
 ateşleme oranından çıkaran bir öneri sistemi. Son onay ve gönderme her zaman insanda.
 
-**Durum:** Faz 0 (kurulum). Yol haritası: [docs/ROADMAP.md](docs/ROADMAP.md).
+**Durum:** Faz 1 tamamlandı: sinek beyni çalışıyor ve Shiu et al. 2024'ün sonuçlarını tekrar üretiyor
+([doğrulama raporu](docs/BRAIN_VALIDATION.md)). Yol haritası: [docs/ROADMAP.md](docs/ROADMAP.md).
+
+| Girdi (1 s, 10 deneme) | MN9 |
+|---|---|
+| Şeker 200 Hz | 92 Hz, hortum uzatılır |
+| Şeker 100 Hz + acı 100 Hz | 3 Hz, acı şekeri bastırır |
+| Su 200 Hz | 32 Hz |
+
+![Sineğin karar yüzeyi](docs/figures/decision_surface.png)
+
+```bash
+flyhire brain simulate --sugar 100 --bitter 20   # tek girdi, ~15 s
+flyhire brain surface                            # karar yüzeyi, ~80 dk, devam ettirilebilir
+flyhire brain heatmap                            # docs/figures/decision_surface.png
+```
 
 | Katman | Kim karar veriyor? |
 |---|---|
@@ -26,7 +41,8 @@ docker compose up -d
 alembic upgrade head
 flyhire data download
 flyhire info
-pytest
+pytest            # hızlı testler (~15 s), Brian2 ile birebir eşdeğerlik dahil
+pytest -m slow    # tam beyin biyolojik testleri (~1 dk)
 ```
 
 ## Dokümanlar

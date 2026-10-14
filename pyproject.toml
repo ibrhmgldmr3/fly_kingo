@@ -27,7 +27,7 @@ dependencies = [
 
 [project.optional-dependencies]
 # Faz 1: sinek beyni. torch CPU sürümü ayrıca kurulur (bkz. environment.yml).
-brain = ["brian2>=2.7", "torch>=2.3", "scipy>=1.12"]
+brain = ["brian2>=2.7", "torch>=2.3", "scipy>=1.12", "matplotlib>=3.8"]
 # Faz 2: ilan toplama
 ingest = ["google-api-python-client>=2.130", "google-auth-oauthlib>=1.2", "feedparser>=6", "trafilatura>=1.9", "apscheduler>=3.10,<4"]
 # Faz 2: LLM ve embedding (sağlayıcıdan bağımsız)
@@ -48,6 +48,7 @@ where = ["src"]
 testpaths = ["tests"]
 markers = ["slow: tam beyin simülasyonu gerektiren uzun testler (Colab veya uzun CPU koşusu)"]
 addopts = "-m 'not slow'"
+filterwarnings = ["ignore::DeprecationWarning:brian2.*", "ignore::DeprecationWarning:pyparsing.*"]
 
 [tool.ruff]
 line-length = 100
@@ -55,3 +56,6 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["typer.Option", "typer.Argument"]
