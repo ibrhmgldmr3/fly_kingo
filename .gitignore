@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+
+# Ortam ve sırlar
+.env
+credentials*.json
+token*.json
+
+# Veri (repoya girmez; `flyhire data download` ile iner)
+data/*
+!data/.gitkeep
+results/
+mlruns/
+
+# Kişisel veri: gerçek CV, deneyim dosyası, e-postalar
+private/
+
+# Editör / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.ipynb_checkpoints/

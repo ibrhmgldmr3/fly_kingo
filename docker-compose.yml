@@ -1,0 +1,20 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: flyhire-db
+    environment:
+      POSTGRES_USER: flyhire
+      POSTGRES_PASSWORD: flyhire
+      POSTGRES_DB: flyhire
+    ports:
+      - "5433:5432"
+    volumes:
+      - flyhire_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flyhire -d flyhire"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  flyhire_pg:

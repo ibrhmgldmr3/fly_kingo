@@ -1,0 +1,11 @@
+name: fly_kingo
+channels:
+  - defaults
+dependencies:
+  - python=3.12
+  - pip
+# Python paketleri pyproject.toml'da tanımlı. Kurulum:
+#   conda env create -f environment.yml
+#   conda activate fly_kingo
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   pip install -e ".[brain,dev]"
