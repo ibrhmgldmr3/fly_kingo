@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,6 +14,10 @@ class Settings(BaseSettings):
     data_dir: Path = Path("data")
 
     llm_model: str = "anthropic/claude-sonnet-5-5"
+    # pydantic-settings .env'i os.environ'a yazmaz; anahtarlar istemciye açıkça verilir.
+    anthropic_api_key: SecretStr | None = None
+    openai_api_key: SecretStr | None = None
+    together_api_key: SecretStr | None = None
     embedding_model: str = "intfloat/multilingual-e5-base"
 
     gmail_credentials_path: Path = Path("private/gmail_credentials.json")

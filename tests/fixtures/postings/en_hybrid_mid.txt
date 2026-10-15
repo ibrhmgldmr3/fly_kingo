@@ -1,0 +1,18 @@
+Data Engineer (Mid-level), Hybrid - Berlin
+
+We are looking for a Data Engineer to build and maintain our data platform.
+
+Requirements:
+- 3+ years of experience as a data engineer
+- Strong Python and SQL
+- Experience with Airflow and dbt
+- Familiarity with AWS (S3, Redshift)
+
+Nice to have:
+- Kafka
+- Terraform
+
+You will be our go-to person for data engineering, DevOps, frontend dashboards and customer support.
+
+Hybrid: 3 days per week in our Berlin office.
+Salary: EUR 65,000 - 80,000 per year.

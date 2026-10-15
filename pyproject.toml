@@ -46,8 +46,11 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["slow: tam beyin simülasyonu gerektiren uzun testler (Colab veya uzun CPU koşusu)"]
-addopts = "-m 'not slow'"
+markers = [
+    "slow: tam beyin simülasyonu gerektiren uzun testler (Colab veya uzun CPU koşusu)",
+    "llm: gerçek LLM çağrısı yapan testler (API anahtarı ister, ücretli)",
+]
+addopts = "-m 'not slow and not llm'"
 filterwarnings = ["ignore::DeprecationWarning:brian2.*", "ignore::DeprecationWarning:pyparsing.*"]
 
 [tool.ruff]

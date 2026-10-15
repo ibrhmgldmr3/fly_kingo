@@ -100,6 +100,8 @@ Ayrıntılı sonuçlar: [BRAIN_VALIDATION.md](BRAIN_VALIDATION.md).
 - Gmail iş alarmı okuyucusu (LinkedIn, Kariyer.net, Indeed alarmları), link ayıklama.
 - 1–2 RSS/API kaynağı (Remote OK, Greenhouse/Lever board'ları). `trafilatura` ile temiz metin. Hash ile tekrar ayıklama.
 - `JobFeatures` Pydantic şeması (doküman §4.2), Instructor ile çıkarım, 20 ilanda elle kontrol.
+  - ✅ Şema ve çıkarım: `src/flyhire/extract/`, `flyhire extract ilan.txt`. Kırmızı bayrak alıntıları ilanda birebir geçmek zorunda (geçmezse LLM'den düzeltmesi istenir). Gerçek LLM testleri `pytest -m llm` (API anahtarı ister).
+  - ⏳ 20 ilanda elle kontrol.
 - CV ve ilan embedding'leri pgvector'a, kosinüs benzerliği. (Repoya **sahte CV**. Gerçek CV yalnızca yerelde.)
 - APScheduler günlük toplama.
 - **Bitti tanımı:** tablo her gün otomatik doluyor, özellikler ve benzerlik skorları hesaplanmış.

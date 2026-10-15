@@ -1,0 +1,17 @@
+Junior Makine Öğrenmesi Mühendisi (Uzaktan)
+
+Ürün ekibimizde öneri sistemleri üzerinde çalışacak bir Junior ML Mühendisi arıyoruz.
+
+Gereksinimler:
+- Bilgisayar Mühendisliği veya ilgili bölüm mezunu (yeni mezunlar başvurabilir)
+- Python ve PyTorch ile proje deneyimi
+- Temel istatistik ve makine öğrenmesi bilgisi
+- Git kullanımı
+
+Artı olarak değerlendirilir:
+- Docker
+- Spark veya büyük veri araçları
+
+Çalışma şekli: Tamamen uzaktan (Türkiye içinden).
+Maaş: aylık brüt 60.000 - 80.000 TL.
+Esnek çalışma saatleri ve yıllık eğitim bütçesi.

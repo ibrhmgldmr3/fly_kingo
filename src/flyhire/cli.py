@@ -132,5 +132,24 @@ def brain_heatmap(
     typer.echo(f"Kaydedildi: {out}")
 
 
+@app.command()
+def extract(
+    path: Path = typer.Argument(..., exists=True, dir_okay=False, help="İlan metni (.txt)"),
+    title: str | None = typer.Option(None),
+    company: str | None = typer.Option(None),
+    location: str | None = typer.Option(None),
+    model: str | None = typer.Option(None, help="Varsayılan: .env'deki LLM_MODEL"),
+) -> None:
+    """Bir ilan metninden yapılandırılmış özellikleri LLM ile çıkarır (JSON yazar)."""
+    from flyhire.extract.llm import extract_features, make_client
+    from flyhire.extract.schema import JobPosting
+
+    posting = JobPosting(
+        text=path.read_text(encoding="utf-8"), title=title, company=company, location=location
+    )
+    features = extract_features(posting, client=make_client(model))
+    typer.echo(features.model_dump_json(indent=2))
+
+
 if __name__ == "__main__":
     app()
