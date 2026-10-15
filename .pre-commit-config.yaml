@@ -12,3 +12,8 @@ repos:
         args: [--maxkb=1024]
       - id: end-of-file-fixer
       - id: trailing-whitespace
+  # Notebook çıktıları repoya girmez (Colab'da da `private_outputs` ile kapalı).
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.7.1
+    hooks:
+      - id: nbstripout

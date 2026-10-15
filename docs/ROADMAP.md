@@ -20,7 +20,7 @@
 
 | Katman | Seçim | Gerekçe / not |
 |---|---|---|
-| Dil, ortam | **Python 3.12**, **conda ortamı `fly_kingo`** (`environment.yml`), bağımlılıklar `pyproject.toml`'da, `pip install -e ".[dev]"` ile kurulum. ruff, pytest, pre-commit | Brian2, PyTorch (CPU) ve Streamlit 3.12'yi destekliyor. Conda yalnızca Python'u ve ağır ikili paketleri (numpy/scipy) sağlar, gerisi pip ile kurulur. Colab'da aynı `pyproject.toml` kullanılır. |
+| Dil, ortam | **Python 3.12**, **conda ortamı `fly_kingo`** (`environment.yml`), bağımlılıklar `pyproject.toml`'da, `pip install -e ".[dev]"` ile kurulum. ruff, pytest, pre-commit | Brian2, PyTorch (CPU) ve Streamlit 3.12'yi destekliyor. Conda yalnızca Python'u ve ağır ikili paketleri (numpy/scipy) sağlar, gerisi pip ile kurulur. Colab'da (Python 3.13) aynı `pyproject.toml` kullanılır. |
 | Beyin, referans | **Brian2** + Shiu modelinin parametreleri (`philshiu/Drosophila_brain_model`) | Doğruluk referansı. Tam beyinle yalnızca Colab'da çalıştırılır. |
 | Beyin, hızlı | **Kendi PyTorch LIF döngümüz** (`torch.sparse` CSR, batch = deneme sayısı, CPU/CUDA otomatik) | Eon'un `fly-brain` reposu GPL-2.0. Kod kopyalanmayacak, yalnızca okunarak örnek alınacak. Böylece repo MIT/Apache kalabilir. Shiu reposunun lisansı Faz 0'da kontrol edilecek. |
 | Connectome verisi | FlyWire v783 (connections + `flywire_annotations` + `drosophila_neurotransmitters`), yükleme `pandas`/`pyarrow` ile | Veri repoya girmeyecek. `flyhire data download` (sabit commit + SHA-256). CC-BY atfı README'de yer alacak. |

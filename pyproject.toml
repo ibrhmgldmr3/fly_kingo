@@ -7,7 +7,7 @@ name = "flyhire"
 version = "0.1.0"
 description = "Hortum Uzatma Kariyer Danışmanlığı: iş ilanlarına bir meyve sineği beyni simülasyonu karar veriyor."
 readme = "README.md"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12,<3.14"
 license = { text = "MIT" }
 authors = [{ name = "İbrahim Güldemir" }]
 dependencies = [
