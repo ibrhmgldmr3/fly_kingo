@@ -2,6 +2,7 @@
 
 import numpy as np
 import pytest
+import torch
 
 from flyhire.brain.lif_torch import TorchLIF
 from flyhire.brain.params import DEFAULT_PARAMS
@@ -80,14 +81,28 @@ def test_matches_brian2_exactly_with_deterministic_input():
     """Girdiler deterministik olduğunda her nöronun spike sayısı Brian2 ile birebir aynı olmalı.
 
     Bu test, refrakter sürede gelen sinaptik girdilerin yok sayılması (Brian2'nin koşullu yazma
-    kuralı) dahil, zaman adımı sırasının birebir aynı olduğunu doğrular.
+    kuralı) dahil, zaman adımı sırasının birebir aynı olduğunu doğrular. Brian2 float64 kullanır;
+    float32'de eşiğe çok yakın birkaç spike yuvarlama yüzünden değişebildiği için test float64 ile
+    ve uzun (2 s) bir simülasyonla yapılır.
     """
     pytest.importorskip("brian2")
     from flyhire.brain.lif_brian2 import run_brian2
 
     n, pre, post, signed_count = _random_net()
     rates = {i: ALWAYS for i in range(3)}
-    torch_counts = TorchLIF(n, pre, post, signed_count).run(rates, 300, 1).counts[0]
-    brian_counts = run_brian2(n, pre, post, signed_count, rates, 300, 1, codegen_target="numpy")[0]
-    assert torch_counts.sum() > 1000  # ağ gerçekten aktif
+    model = TorchLIF(n, pre, post, signed_count, dtype=torch.float64)
+    torch_counts = model.run(rates, 2000, 1).counts[0]
+    brian_counts = run_brian2(n, pre, post, signed_count, rates, 2000, 1, codegen_target="numpy")[0]
+    assert torch_counts.sum() > 10_000  # ağ gerçekten aktif
     np.testing.assert_array_equal(torch_counts, brian_counts)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA yok")
+def test_cuda_matches_cpu_exactly():
+    n, pre, post, signed_count = _random_net()
+    rates = {i: ALWAYS for i in range(3)}
+    cpu = TorchLIF(n, pre, post, signed_count, dtype=torch.float64).run(rates, 1000, 1)
+    gpu = TorchLIF(n, pre, post, signed_count, device="cuda", dtype=torch.float64).run(
+        rates, 1000, 1
+    )
+    np.testing.assert_array_equal(cpu.counts, gpu.counts)

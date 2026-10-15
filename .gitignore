@@ -27,3 +27,6 @@ private/
 .DS_Store
 Thumbs.db
 .ipynb_checkpoints/
+
+# Colab kod paketi (scripts/make_colab_bundle.py)
+fly_kingo_colab.zip

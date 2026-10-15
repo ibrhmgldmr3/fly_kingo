@@ -4,6 +4,7 @@ Diğer katmanlar (kodlayıcı, eşik, panel) beyne yalnızca `FlyBrain.simulate`
 "şu tat kanallarına şu frekansları ver, şu kadar süre ilerlet, okunan nöronların oranlarını döndür".
 """
 
+import hashlib
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -41,8 +42,6 @@ class FlyBrain:
     ):
         self.connectome = connectome
         self.model = TorchLIF.from_connectome(connectome, params, device)
-        self.version = f"shiu-lif/{connectome.version}"
-
         available = connectome.flywire_ids
         self.channels: dict[str, np.ndarray] = {}
         self.missing: dict[str, list[int]] = {}
@@ -52,6 +51,14 @@ class FlyBrain:
             self.missing[name] = missing
         self.readout_names = tuple(neurons.READOUT)
         self.readout = connectome.index_of(neurons.READOUT.values())
+
+        # Sürüm etiketi kanal tanımını da içerir: kanallar değişirse eski karar yüzeyi reddedilir.
+        digest = hashlib.sha256()
+        for name in sorted(self.channels):
+            digest.update(name.encode() + self.channels[name].tobytes())
+        digest.update(self.readout.tobytes())
+        sizes = "-".join(str(len(self.channels[k])) for k in ("sugar", "water", "bitter"))
+        self.version = f"shiu-lif/{connectome.version}/grn{sizes}/{digest.hexdigest()[:8]}"
 
     @classmethod
     def from_directory(cls, directory: Path, **kwargs) -> "FlyBrain":

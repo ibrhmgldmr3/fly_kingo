@@ -1,13 +1,18 @@
 """Tat kanalları ve okunan nöronlar (FlyWire kök ID'leri).
 
-Listeler Shiu et al. 2024 `figures.ipynb` dosyasından alınmıştır ve FlyWire v630 kök ID'leridir.
-v783'te proofreading nedeniyle bazı kök ID'ler değişti:
+Listeler Shiu et al. 2024 `figures.ipynb` dosyasından alınmıştır ve FlyWire v630 kök ID'leridir;
+kaynağa sadık kalmak için aynen tutulur. v783'te proofreading ile bazı kök ID'ler değişti:
 
-- şeker: 21 ID'nin 20'si v783'te var (720575940620900446 yok)
-- acı:   21 ID'nin 20'si v783'te var (720575940618600651 yok)
-- su:    18/18 var
+- şeker: 21 ID'nin 20'si v783'te aynen var; 720575940620900446 → 720575940639259967
+- acı:   21 ID'nin 20'si v783'te aynen var; 720575940618600651 → 720575940619072513
+- su:    18/18 aynen var
 - MN9:   Shiu'nun okuduğu MN9 (720575940660219265) aynen var. Karşı taraftaki MN9'un v630 ID'si
          (720575940645521262) yok; v783 karşılığı aynı hücre tipindeki (CB0701) 720575940618238523.
+
+GRN eşlemeleri CAVE ile bulundu (`scripts/map_missing_grns.py`): iki durumda da eski kök tamamen tek
+bir v783 köküne geçmiş (supervoxel örtüşmesi 1,0) ve başka parçalarla birleşmiş; bölünme yok. Yeni
+kökler başka hiçbir listede değil ve v783 tipleri kanalla uyumlu (LB3c şeker, LB1c acı).
+`TASTE_CHANNELS` bu eşlemeyle v783 ID'lerini içerir.
 
 Eksik ID'ler sessizce atlanmaz: `resolve` eksikleri döndürür, testler sayıları sabitler.
 
@@ -48,10 +53,21 @@ WATER_GRN: tuple[int, ...] = (
 MN9 = 720575940660219265  # Shiu'nun okuduğu MN9: tat girdileriyle aynı taraf
 MN9_CONTRA = 720575940618238523  # karşı taraftaki MN9 (v783)
 
+# v630 kök ID → v783 kök ID (CAVE `get_latest_roots`, v783 zaman damgası)
+V783_REPLACEMENTS: dict[int, int] = {
+    720575940620900446: 720575940639259967,  # şeker GRN, LB3c
+    720575940618600651: 720575940619072513,  # acı GRN, LB1c
+}
+
+
+def to_v783(ids: Iterable[int]) -> tuple[int, ...]:
+    return tuple(V783_REPLACEMENTS.get(i, i) for i in ids)
+
+
 TASTE_CHANNELS: dict[str, tuple[int, ...]] = {
-    "sugar": SUGAR_GRN,
-    "water": WATER_GRN,
-    "bitter": BITTER_GRN,
+    "sugar": to_v783(SUGAR_GRN),
+    "water": to_v783(WATER_GRN),
+    "bitter": to_v783(BITTER_GRN),
 }
 
 READOUT: dict[str, int] = {"mn9": MN9, "mn9_contra": MN9_CONTRA}

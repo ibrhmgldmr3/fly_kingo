@@ -12,6 +12,7 @@ Eşikler gözlenen değerlerden geniş paylarla seçildi (CPU, 10 deneme, seed=2
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from flyhire.brain import data as brain_data
@@ -31,17 +32,16 @@ def brain():
 
 @needs_data
 def test_channel_coverage(brain):
-    """v630 → v783 ID kaybı bilinçli olarak sabitlenir; değişirse fark edilir."""
+    """Shiu listelerinin tamamı (v783 eşlemesiyle) modelde bulunur; değişirse fark edilir."""
     assert {name: len(idx) for name, idx in brain.channels.items()} == {
-        "sugar": 20,
+        "sugar": 21,
         "water": 18,
-        "bitter": 20,
+        "bitter": 21,
     }
-    assert brain.missing == {
-        "sugar": [720575940620900446],
-        "water": [],
-        "bitter": [720575940618600651],
-    }
+    assert brain.missing == {"sugar": [], "water": [], "bitter": []}
+    # eşlenen yeni kökler başka bir kanalda tekrar etmemeli
+    all_idx = np.concatenate(list(brain.channels.values()))
+    assert len(np.unique(all_idx)) == len(all_idx)
 
 
 @needs_data

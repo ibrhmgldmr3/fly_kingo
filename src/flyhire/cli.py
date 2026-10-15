@@ -67,6 +67,10 @@ def brain_surface(
     out: Path = typer.Option(DEFAULT_SURFACE, help="Çıktı dosyası (yarım kaldıysa devam eder)"),
     trials: int = typer.Option(5, help="Izgara noktası başına deneme sayısı"),
     seed: int = typer.Option(0),
+    device: str = typer.Option("cpu", help="cpu veya cuda"),
+    batch_conditions: int = typer.Option(
+        6, help="Bir batch'teki ızgara noktası sayısı (GPU'da 24+ daha hızlı)"
+    ),
 ) -> None:
     """Şeker × su × acı karar yüzeyini hesaplar."""
     from flyhire.brain.api import get_brain
@@ -78,7 +82,14 @@ def brain_surface(
         elapsed = time.perf_counter() - start
         typer.echo(f"{done}/{total} nokta  ({elapsed / 60:.1f} dk)")
 
-    surface = compute_surface(get_brain(), out, n_trials=trials, seed=seed, progress=progress)
+    surface = compute_surface(
+        get_brain(device=device),
+        out,
+        n_trials=trials,
+        seed=seed,
+        conditions_per_batch=batch_conditions,
+        progress=progress,
+    )
     typer.echo(f"Tamamlandı: {out}  (tam: {surface.complete})")
 
 
@@ -86,6 +97,7 @@ def brain_surface(
 def brain_check_surface(
     surface_path: Path = typer.Option(DEFAULT_SURFACE, "--surface"),
     points: int = typer.Option(24, help="Rastgele kontrol noktası sayısı"),
+    device: str = typer.Option("cpu", help="cpu veya cuda"),
 ) -> None:
     """Yüzey interpolasyonunu ızgara dışı noktalarda gerçek simülasyonla karşılaştırır."""
     import numpy as np
@@ -93,7 +105,7 @@ def brain_check_surface(
     from flyhire.brain.api import get_brain
     from flyhire.brain.surface import DecisionSurface, interpolation_error
 
-    rows = interpolation_error(get_brain(), DecisionSurface.load(surface_path), points)
+    rows = interpolation_error(get_brain(device=device), DecisionSurface.load(surface_path), points)
     typer.echo(f"{'şeker':>6} {'su':>6} {'acı':>6} | {'yüzey':>6} {'sim':>6} {'±':>5}")
     for r in rows:
         typer.echo(

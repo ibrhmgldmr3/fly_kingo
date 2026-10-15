@@ -47,10 +47,14 @@ class TorchLIF:
         signed_count: np.ndarray,
         params: LIFParams = DEFAULT_PARAMS,
         device: str | torch.device = "cpu",
+        dtype: torch.dtype = torch.float32,
     ):
         self.n = int(n_neurons)
         self.params = params
         self.device = torch.device(device)
+        # float32 hızlıdır; Brian2 float64 kullanır. Eşiğe çok yakın durumlarda yuvarlama farkı tek
+        # bir spike'ı değiştirebilir, bu yüzden birebir karşılaştırma float64 ile yapılır.
+        self.dtype = dtype
 
         # Giden bağlantılar için CSR: spike atan nöronun tüm hedeflerine tek seferde erişim.
         order = np.argsort(pre, kind="stable")
@@ -59,11 +63,13 @@ class TorchLIF:
         self._indptr = torch.as_tensor(indptr, dtype=torch.int64, device=self.device)
         self._post = torch.as_tensor(post[order], dtype=torch.int64, device=self.device)
         self._w = torch.as_tensor(
-            signed_count[order] * params.w_syn, dtype=torch.float32, device=self.device
+            signed_count[order] * params.w_syn, dtype=dtype, device=self.device
         )
 
     @classmethod
-    def from_connectome(cls, connectome, params: LIFParams = DEFAULT_PARAMS, device="cpu"):
+    def from_connectome(
+        cls, connectome, params: LIFParams = DEFAULT_PARAMS, device="cpu", dtype=torch.float32
+    ):
         return cls(
             connectome.n_neurons,
             connectome.pre,
@@ -71,6 +77,7 @@ class TorchLIF:
             connectome.signed_count,
             params,
             device,
+            dtype,
         )
 
     def weights_digest(self) -> str:
@@ -123,8 +130,8 @@ class TorchLIF:
             silenced[torch.as_tensor(silence, device=dev)] = True
         rec_idx = torch.as_tensor(record or [], dtype=torch.int64, device=dev)
 
-        v = torch.full((b, n), p.v_0, dtype=torch.float32, device=dev)
-        g = torch.zeros((b, n), dtype=torch.float32, device=dev)
+        v = torch.full((b, n), p.v_0, dtype=self.dtype, device=dev)
+        g = torch.zeros((b, n), dtype=self.dtype, device=dev)
         vf, gf = v.view(-1), g.view(-1)
         counts = torch.zeros((b, n), dtype=torch.int32, device=dev)
         blocked = torch.zeros(b * n, dtype=torch.bool, device=dev)
@@ -168,7 +175,7 @@ class TorchLIF:
             queue[slot] = flat[~silenced[flat % n]] if silence else flat
             if stim_idx.numel():
                 fire = torch.rand((b, stim_idx.numel()), generator=gen, device=dev) < stim_p
-                v[:, stim_idx] += fire.to(torch.float32) * p.w_poi
+                v[:, stim_idx] += fire.to(self.dtype) * p.w_poi
 
             # 4. reset
             if flat.numel():
