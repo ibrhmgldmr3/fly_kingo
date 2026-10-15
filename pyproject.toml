@@ -53,6 +53,9 @@ filterwarnings = ["ignore::DeprecationWarning:brian2.*", "ignore::DeprecationWar
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Colab notebook'u `!komut` ve hücre içi import kullanır; pre-commit dosya verse de atlanır.
+extend-exclude = ["notebooks"]
+force-exclude = true
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
