@@ -87,14 +87,14 @@ fly_kingo/
 
 ### Faz 1: Sinek beynini ayağa kaldır · ✅ tamamlandı (14 Ekim 2026)
 Ayrıntılı sonuçlar: [BRAIN_VALIDATION.md](BRAIN_VALIDATION.md).
-- ✅ `neurons.py`: Shiu listeleri (v630). v783'te şeker 20/21, su 18/18, acı 20/21; MN9 aynen var. Karşı taraf MN9'un v783 karşılığı (CB0701) bulundu.
+- ✅ `neurons.py`: Shiu listeleri (v630). v783'te aynen bulunmayan iki GRN CAVE ile eşlendi, kanallar 21/18/21; MN9 aynen var. Karşı taraf MN9'un v783 karşılığı (CB0701) bulundu. Eşlenen iki GRN MN9'u ortalama ~2 Hz, eşik bölgesinde 10–15 Hz'e kadar değiştiriyor (doğrulama raporu §1).
 - ✅ `lif_brian2.py`: Brian2 referansı (Colab gerekmedi; yerelde cython ile ~48 s/deneme).
 - ✅ `lif_torch.py`: PyTorch modeli. Deterministik girdide Brian2 ile **spike spike aynı**; tam beyinde korelasyon 0,999, MN9 89,7 / 89,8 Hz. Brian2'nin refrakter sürede sinaptik girdiyi yok sayma kuralı bulundu ve uygulandı.
 - ✅ Kalıcı testler: `test_sugar_activates_mn9`, `test_bitter_suppresses_sugar`, `test_water_activates_mn9`, `test_weights_unchanged_after_simulation` (`pytest -m slow`), ayrıca hızlı paket.
 - ✅ CPU performansı: 1,45 s/deneme (1 s sanal süre). İlan başına 5 denemelik tam simülasyon ≈ 7 s.
 - ✅ `api.py`: `FlyBrain.simulate()` / `simulate_batch()`; diğer katmanların beyne tek giriş noktası.
-- ✅ `surface.py`: şeker×su×acı yüzeyi (11×6×11 nokta, 5 deneme) CPU'da 81 dakikada hesaplandı. İnterpolasyon hatası ortalama 2,1 Hz (en büyük 6,0 Hz). `flyhire brain check-surface` interpolasyon hatasını ölçer, `flyhire brain heatmap` README görselini çizer.
-- **Plandan sapma:** Colab'a gerek kalmadı. PyTorch modeli CPU'da yeterince hızlı.
+- ✅ `surface.py`: şeker×su×acı yüzeyi (11×6×11 nokta, 5 deneme). İlk sürüm CPU'da 81 dakikada, 21/18/21 sürümü kısmen Colab T4'te hesaplandı. İnterpolasyon hatası (20/18/20 yüzeyi) ortalama 2,1 Hz (en büyük 6,0 Hz). `flyhire brain check-surface` interpolasyon hatasını ölçer, `flyhire brain heatmap` README görselini çizer.
+- **Plandan sapma:** PyTorch modeli CPU'da yeterince hızlı, ama uzun CPU/GPU koşuları dizüstü bilgisayarı kapattığı için ağır hesaplar `notebooks/colab_brain.ipynb` ile Colab'da yapılıyor.
 
 ### Faz 2: İlan boru hattı · 1,5–2 hafta
 - Gmail iş alarmı okuyucusu (LinkedIn, Kariyer.net, Indeed alarmları), link ayıklama.

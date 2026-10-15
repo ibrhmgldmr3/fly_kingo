@@ -1,8 +1,9 @@
-"""Eksik GRN'lerin etkisi: kanaldan rastgele bir nöron daha çıkarıp tam kanalla karşılaştırma.
+"""Bir GRN kaybının etkisi: kanaldan rastgele bir nöron çıkarıp tam kanalla karşılaştırma.
 
-v783'te şeker ve acı kanallarından birer GRN eksik (bkz. docs/BRAIN_VALIDATION.md §1). Bir nöron
-kaybının MN9'a etkisini tahmin etmek için 20 nöronlu kanaldan rastgele bir nöron daha çıkarılır
-(19 nöron) ve aynı girdilerde MN9 oranı karşılaştırılır. Üç farklı nöron için tekrarlanır.
+Shiu listelerindeki iki GRN v783'te farklı kök ID'ye sahip (bkz. docs/BRAIN_VALIDATION.md §1). Bir
+nöron kaybının MN9'a etkisini tahmin etmek için kanaldan rastgele bir nöron çıkarılır (N → N−1) ve
+aynı girdilerde MN9 oranı karşılaştırılır. Üç farklı nöron için tekrarlanır. N, kanalın o anki
+boyutudur (eşleme öncesi 20, sonrası 21).
 
 Kanallar `FlyBrain.channels` geçici olarak değiştirilerek küçültülür; neurons.py değişmez.
 
@@ -87,10 +88,11 @@ def main() -> None:
 
     rows = []
     for channel, points in POINTS.items():
-        for removal_seed, position in pick_removals(len(brain.channels[channel])):
+        size = len(brain.channels[channel])
+        for removal_seed, position in pick_removals(size):
             removed = int(brain.connectome.flywire_ids[brain.channels[channel][position]])
             with channel_without(brain, channel, position):
-                assert len(brain.channels[channel]) == 19
+                assert len(brain.channels[channel]) == size - 1
                 results = brain.simulate_batch(points, 1000.0, n, args.seed)
             for point, result in zip(points, results, strict=True):
                 full_mean, full_sd = summarize(baseline[json.dumps(point, sort_keys=True)])
@@ -98,6 +100,7 @@ def main() -> None:
                 rows.append(
                     {
                         "channel": channel,
+                        "channel_size": size,
                         "removal_seed": removal_seed,
                         "removed_id": removed,
                         "point": label(point),
@@ -116,11 +119,11 @@ def main() -> None:
     args.out.write_text(json.dumps({"meta": meta, "rows": rows}, indent=2), encoding="utf-8")
 
     print(f"cihaz={args.device}  süre={elapsed:.0f} s")
-    print("| Kanal | Çıkarılan nöron | Nokta | 20 nöron (Hz) | 19 nöron (Hz) | Fark ± SE (Hz) |")
+    print("| Kanal (N) | Çıkarılan | Nokta | N nöron (Hz) | N−1 nöron (Hz) | Fark ± SE (Hz) |")
     print("|---|---|---|---|---|---|")
     for r in rows:
         print(
-            f"| {r['channel']} | `{r['removed_id']}` | {r['point']} | "
+            f"| {r['channel']} ({r['channel_size']}) | `{r['removed_id']}` | {r['point']} | "
             f"{r['full_mean']:.1f} ± {r['full_sd']:.1f} | "
             f"{r['ablated_mean']:.1f} ± {r['ablated_sd']:.1f} | "
             f"{r['diff']:+.1f} ± {r['se']:.1f} |"
