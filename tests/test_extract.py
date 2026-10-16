@@ -24,6 +24,7 @@ def _features(**overrides) -> dict:
         "language": "tr",
         "required_skills": ["SQL"],
         "preferred_skills": [],
+        "experience_quote": "En az 5 yıl veri analizi deneyimi",
         "min_years_experience": 5,
         "seniority": "junior",
         "work_mode": "onsite",
@@ -58,6 +59,27 @@ def test_invented_quote_is_rejected():
     flags = [{"kind": "unicorn_role", "quote": "rockstar ninja arıyoruz"}]
     with pytest.raises(ValidationError, match="does not appear in the posting"):
         JobFeatures.model_validate(_features(red_flags=flags), context={"text": RED_FLAGS_TEXT})
+
+
+@pytest.mark.parametrize(
+    ("quote", "years", "kept"),
+    [
+        ("En az 5 yıl veri analizi deneyimi", 5, True),
+        ("Üniversitelerin ilgili bölümlerinden mezun", 0, True),  # "mezun"
+        ("İleri düzeyde SQL ve Excel bilgisi", 3, False),  # alıntıda sayı yok
+        ("İleri düzeyde SQL ve Excel bilgisi", 0, False),  # deneyimsiz kabul edildiği yazmıyor
+        (None, 5, False),  # alıntı yok
+        ("", 0, False),  # boş alıntı
+        ("En az 3 yıl deneyim", 3, False),  # ilanda geçmeyen alıntı
+    ],
+)
+def test_years_must_be_supported_by_quote(quote, years, kept):
+    """Desteklenmeyen yıl sayısı hata vermez, null yapılır (ilan kaybolmasın)."""
+    features = JobFeatures.model_validate(
+        _features(experience_quote=quote, min_years_experience=years),
+        context={"text": RED_FLAGS_TEXT},
+    )
+    assert features.min_years_experience == (years if kept else None)
 
 
 def test_quote_check_skipped_without_context():

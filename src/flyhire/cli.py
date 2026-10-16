@@ -133,6 +133,42 @@ def brain_heatmap(
 
 
 @app.command()
+def ingest(
+    config: Path = typer.Option(Path("configs/sources.yaml"), exists=True, dir_okay=False),
+    out: Path | None = typer.Option(
+        None, help="JSONL çıktısı (varsayılan: data/jobs/ats-YYYYMMDD-HHMM.jsonl)"
+    ),
+    db: bool = typer.Option(False, "--db", help="PostgreSQL'e de yaz (docker compose up -d)"),
+) -> None:
+    """Herkese açık ATS ilan sayfalarından ilanları toplar, filtreler, kaydeder."""
+    from datetime import datetime
+
+    from flyhire.ingest.sources import SourcesConfig
+    from flyhire.ingest.store import collect, write_jsonl
+
+    def progress(key: str, fetched: int, kept: int) -> None:
+        typer.echo(f"{key:<28} {fetched:>4} ilan, {kept:>3} tutuldu")
+
+    result = collect(SourcesConfig.load(config), progress=progress)
+    for key, error in result.errors.items():
+        typer.echo(f"{key:<28} HATA: {error}", err=True)
+
+    out = out or Path(f"data/jobs/ats-{datetime.now():%Y%m%d-%H%M}.jsonl")
+    write_jsonl(result.kept, out)
+    typer.echo(
+        f"Toplam {result.fetched} ilan, {len(result.kept)} tutuldu"
+        f" ({result.duplicates} tekrar, {result.empty} boş metin ayıklandı) → {out}"
+    )
+    if db:
+        from flyhire.db.session import make_session_factory
+        from flyhire.ingest.store import save_jobs
+
+        with make_session_factory()() as session:
+            new, existing = save_jobs(session, result.kept)
+        typer.echo(f"Veritabanı: {new} yeni, {existing} zaten vardı")
+
+
+@app.command()
 def extract(
     path: Path = typer.Argument(..., exists=True, dir_okay=False, help="İlan metni (.txt)"),
     title: str | None = typer.Option(None),

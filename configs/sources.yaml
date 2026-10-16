@@ -1,0 +1,70 @@
+# İlan kaynakları (Faz 2). Yalnızca herkese açık ATS uç noktaları; giriş gerektiren site yok.
+#
+# Elastic çıkarıldı: ilan lokasyonları yalnızca ülke adı (uzaktan mı belli değil).
+#
+# Filtreler yalnızca alan ve lokasyon seçer, kıdemi elemez: kıdem uyumsuzluğunu sinek "acı" olarak
+# tatmalı. Desenler büyük/küçük harfe duyarsız düzenli ifadelerdir.
+
+filters:
+  title_include:
+    - '\bdata\b'
+    - '\bveri\b'
+    - 'machine learning'
+    - 'makine öğrenme'
+    - '\bml\b'
+    - '\bai\b'
+    - 'yapay zeka'
+    - 'analyst'
+    - 'analist'
+    - 'analytics'
+    - 'scientist'
+    - 'bilim'
+    - '\bnlp\b'
+    - 'computer vision'
+  # alan dışı (satış, İK, iletişim); kıdem burada elenmez
+  title_exclude:
+    - 'account executive'
+    - '\bsales\b'
+    - 'talent'
+    - 'recruit'
+    - 'communications'
+    - 'deal desk'
+  location_include:
+    - 'turkey'
+    - 'türkiye'
+    - '\btr\b'
+    - 'istanbul'
+    - 'İstanbul'
+    - 'ankara'
+    - 'izmir'
+    - 'remote'
+    - 'uzaktan'
+    - 'home based'
+    - 'emea'
+    - 'europe'
+    - 'anywhere'
+    - 'worldwide'
+    - 'global'
+  # Yalnızca Amerika kıtasına açık uzaktan çalışma (yer bazında uygulanır, bkz. sources.py)
+  location_exclude:
+    - 'united states'
+    - '\bus\b'
+    - '\busa\b'
+    - 'canada'
+    - 'americas'
+
+# provider: greenhouse | lever | ashby, slug: kariyer sayfası adresindeki şirket adı
+boards:
+  # Türkiye
+  - {provider: lever, slug: insiderone, company: Insider One}
+  - {provider: lever, slug: trendyol, company: Trendyol}
+  - {provider: lever, slug: dreamgames, company: Dream Games}
+  - {provider: lever, slug: peakgames, company: Peak Games}
+  - {provider: lever, slug: picus, company: Picus Security}
+  - {provider: lever, slug: iyzico, company: iyzico}
+  # Uzaktan çalışmaya açık
+  - {provider: greenhouse, slug: gitlab, company: GitLab}
+  - {provider: greenhouse, slug: grafanalabs, company: Grafana Labs}
+  - {provider: greenhouse, slug: canonical, company: Canonical}
+  - {provider: ashby, slug: posthog, company: PostHog}
+  - {provider: ashby, slug: supabase, company: Supabase}

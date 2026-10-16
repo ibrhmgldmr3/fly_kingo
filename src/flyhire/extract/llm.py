@@ -12,7 +12,7 @@ from flyhire.config import get_settings
 from flyhire.extract.schema import JobFeatures, JobPosting
 
 # İstem değişirse artırılır; veritabanında hangi istemle çıkarıldığı bununla izlenir.
-PROMPT_VERSION = "features-v1"
+PROMPT_VERSION = "features-v2"
 
 SYSTEM_PROMPT = """\
 You extract structured facts from one job posting. The posting may be in Turkish or English.
@@ -20,7 +20,12 @@ You extract structured facts from one job posting. The posting may be in Turkish
 Rules:
 - Use only what the posting states. Do not guess, infer from the company, or fill gaps.
 - Skills: short names as written in the posting (e.g. "Python", "SQL", "Docker"); no duplicates.
-- Years of experience: the minimum the posting requires. "3+ yıl" or "at least 3 years" is 3.
+- Years of experience: first quote the phrase that states it (experience_quote), then give the
+  minimum. "3+ yıl" or "at least 3 years" is 3. Use 0 only if the posting explicitly welcomes new
+  graduates or no experience. If no number of years is written, both are null; "experience with
+  X" alone is not a number.
+- Seniority: only if the title or text states the level (intern, junior, senior, lead, ...).
+  Do not infer it from the skills or responsibilities; otherwise use unspecified.
 - Salary: only when at least one number is given. "Competitive salary" or "rekabetçi maaş" without
   a number is not a salary; report it as a vague_salary red flag instead.
 - Red flags: phrases that signal poor working conditions. Categories:
