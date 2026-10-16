@@ -205,6 +205,51 @@ def test_save_jobs_skips_existing(db_session):
         db_session.commit()
 
 
+def test_extract_jobs_saves_features_and_skips_failures(db_session):
+    from sqlalchemy import delete, select
+
+    from flyhire.db.models import Job, JobFeatures
+    from flyhire.extract.llm import PROMPT_VERSION
+    from flyhire.extract.pipeline import extract_jobs, pending_jobs
+    from flyhire.extract.schema import JobFeatures as Features
+    from flyhire.ingest.store import save_jobs
+
+    fetched = [_job(title="DB pipe ok", text="pytest-ok"), _job(title="DB pipe x", text="pytest-x")]
+    hashes = [j.content_hash for j in fetched]
+    save_jobs(db_session, fetched)
+    ok, bad = (db_session.scalar(select(Job).where(Job.content_hash == h)) for h in hashes)
+    features = Features(
+        language="en",
+        required_skills=["SQL"],
+        preferred_skills=[],
+        seniority="unspecified",
+        work_mode="remote",
+        flexible_hours=False,
+        red_flags=[],
+    )
+
+    class Client:
+        def create(self, *, messages, **kwargs):
+            if "pytest-x" in messages[1]["content"]:
+                raise RuntimeError("LLM yanıt vermedi")
+            return features
+
+    try:
+        # yalnızca bu testin ilanları işlenir; veritabanındaki gerçek ilanlara dokunulmaz
+        result = extract_jobs(db_session, [ok, bad], Client(), "test/model")
+        assert result.done == 1
+        assert list(result.failed) == [bad.id] and "LLM yanıt vermedi" in result.failed[bad.id]
+        row = db_session.get(JobFeatures, ok.id)
+        assert row.prompt_version == PROMPT_VERSION and row.llm_model == "test/model"
+        assert row.data["required_skills"] == ["SQL"]
+        # başarısız ilan bir sonraki koşuda yine bekleyenler arasında, başarılı olan değil
+        waiting = {j.id for j in pending_jobs(db_session)}
+        assert bad.id in waiting and ok.id not in waiting
+    finally:
+        db_session.execute(delete(Job).where(Job.content_hash.in_(hashes)))
+        db_session.commit()
+
+
 def test_default_config_loads():
     config = SourcesConfig.load()
     assert config.boards and config.filters.title_include

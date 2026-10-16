@@ -200,3 +200,38 @@ def test_live_english_hybrid_mid(live_client):
     assert f.work_mode == WorkMode.HYBRID
     assert f.salary is not None and f.salary.currency == "EUR"
     assert RedFlagKind.UNICORN_ROLE in {flag.kind for flag in f.red_flags}
+
+
+# --- elle kontrol CSV'si (LLM'siz) ---------------------------------------------------------
+
+
+def test_review_values_are_readable():
+    from flyhire.extract.review import _value
+
+    data = _features(
+        red_flags=[{"kind": "family_environment", "quote": "aile ortamı"}],
+        salary={"min": 60000, "max": 80000, "currency": "TRY", "period": "month"},
+    )
+    assert _value(data, "experience") == "5 yıl: “En az 5 yıl veri analizi deneyimi”"
+    assert _value(data, "salary") == "60,000 - 80,000 TRY / month"
+    assert _value(data, "red_flags") == "family_environment: “aile ortamı”"
+    assert _value(data, "preferred_skills") == "(yok)"
+    assert _value(_features(min_years_experience=None), "experience") == "(yazmıyor)"
+
+
+def test_score_review_counts_marks_per_field(tmp_path):
+    from flyhire.extract.review import score_review
+
+    path = tmp_path / "review.csv"
+    path.write_text(
+        "job_id;sirket;baslik;url;alan;deger;dogru;not\n"
+        "1;A;T;u;seniority;junior;e;\n"
+        "1;A;T;u;salary;(yok);H;maaş yazıyor\n"
+        "2;A;T;u;seniority;mid;evet;\n"
+        "2;A;T;u;salary;(yok);;\n",
+        encoding="utf-8-sig",
+    )
+    score = score_review(path)
+    assert score.correct["seniority"] == 2 and score.wrong["salary"] == 1
+    assert score.unmarked == 1
+    assert score.lines()[-2].startswith("TOPLAM") and "2/3" in score.lines()[-2]

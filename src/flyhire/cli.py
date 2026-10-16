@@ -170,21 +170,78 @@ def ingest(
 
 @app.command()
 def extract(
-    path: Path = typer.Argument(..., exists=True, dir_okay=False, help="İlan metni (.txt)"),
+    path: Path | None = typer.Argument(
+        None, exists=True, dir_okay=False, help="İlan metni (.txt); --db ile verilmez"
+    ),
+    db: bool = typer.Option(False, "--db", help="Veritabanındaki özelliği olmayan ilanları işle"),
+    limit: int | None = typer.Option(None, help="--db: en fazla bu kadar ilan"),
+    redo: bool = typer.Option(False, help="--db: eski istem sürümüyle çıkarılanları yenile"),
     title: str | None = typer.Option(None),
     company: str | None = typer.Option(None),
     location: str | None = typer.Option(None),
     model: str | None = typer.Option(None, help="Varsayılan: .env'deki LLM_MODEL"),
 ) -> None:
-    """Bir ilan metninden yapılandırılmış özellikleri LLM ile çıkarır (JSON yazar)."""
+    """İlanlardan yapılandırılmış özellikleri LLM ile çıkarır.
+
+    Dosya verilirse sonucu JSON olarak yazar; --db ile `jobs` tablosunu `job_features`'a işler.
+    """
     from flyhire.extract.llm import extract_features, make_client
     from flyhire.extract.schema import JobPosting
+
+    model = model or get_settings().llm_model
+    if db:
+        from flyhire.db.session import make_session_factory
+        from flyhire.extract.pipeline import extract_jobs, pending_jobs
+
+        def progress(job, error: str | None) -> None:
+            status = f"HATA {error}" if error else "tamam"
+            typer.echo(f"#{job.id:<5} {job.company[:16]:<16} {job.title[:44]:<44} {status}")
+
+        with make_session_factory()() as session:
+            jobs = pending_jobs(session, redo=redo, limit=limit)
+            typer.echo(f"{len(jobs)} ilan bekliyor")
+            result = extract_jobs(session, jobs, make_client(model), model, progress=progress)
+        typer.echo(f"{result.done} ilan işlendi, {len(result.failed)} hata ({model})")
+        return
+    if path is None:
+        raise typer.BadParameter("ilan dosyası ya da --db verin")
 
     posting = JobPosting(
         text=path.read_text(encoding="utf-8"), title=title, company=company, location=location
     )
     features = extract_features(posting, client=make_client(model))
     typer.echo(features.model_dump_json(indent=2))
+
+
+review_app = typer.Typer(help="Özellik çıkarımının elle kontrolü", no_args_is_help=True)
+app.add_typer(review_app, name="review")
+
+
+@review_app.command("export")
+def review_export(
+    n: int = typer.Option(20, help="Kontrol edilecek ilan sayısı"),
+    seed: int = typer.Option(0),
+    out: Path = typer.Option(Path("data/review/features.csv")),
+) -> None:
+    """Rastgele ilanların çıkarılan alanlarını kontrol için CSV'ye yazar (Excel'de açılır)."""
+    from flyhire.db.session import make_session_factory
+    from flyhire.extract.review import export_review
+
+    with make_session_factory()() as session:
+        ids = export_review(session, out, n=n, seed=seed)
+    typer.echo(f"{len(ids)} ilan → {out}")
+    typer.echo("'dogru' sütununa e (doğru) veya h (yanlış) yazın, sonra: flyhire review score")
+
+
+@review_app.command("score")
+def review_score(
+    path: Path = typer.Argument(Path("data/review/features.csv"), exists=True),
+) -> None:
+    """Doldurulmuş kontrol CSV'sinden alan bazında doğruluk oranını hesaplar."""
+    from flyhire.extract.review import score_review
+
+    for line in score_review(path).lines():
+        typer.echo(line)
 
 
 if __name__ == "__main__":

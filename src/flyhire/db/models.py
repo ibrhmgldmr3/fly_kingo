@@ -52,6 +52,8 @@ class JobFeatures(Base):
     job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), primary_key=True)
     data: Mapped[dict] = mapped_column(JSONB)
     llm_model: Mapped[str] = mapped_column(String(100))
+    # extract.llm.PROMPT_VERSION; istem değişince eski çıkarımlar ayırt edilebilsin
+    prompt_version: Mapped[str | None] = mapped_column(String(30))
     cv_similarity: Mapped[float | None] = mapped_column(Float)
     extracted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
