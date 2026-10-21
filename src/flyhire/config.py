@@ -18,7 +18,11 @@ class Settings(BaseSettings):
     anthropic_api_key: SecretStr | None = None
     openai_api_key: SecretStr | None = None
     together_api_key: SecretStr | None = None
-    embedding_model: str = "intfloat/multilingual-e5-base"
+    # 1024 boyutlu; değişirse db.models.EMBEDDING_DIM ve migration da değişmeli
+    embedding_model: str = "intfloat/multilingual-e5-large"
+    # Gerçek CV yalnızca yerelde (private/ gitignore'da); yoksa repodaki sahte CV kullanılır.
+    cv_path: Path = Path("private/cv.md")
+    example_cv_path: Path = Path("configs/cv.example.md")
 
     gmail_credentials_path: Path = Path("private/gmail_credentials.json")
     gmail_token_path: Path = Path("private/gmail_token.json")

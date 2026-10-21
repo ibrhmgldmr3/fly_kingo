@@ -262,6 +262,45 @@ def test_extract_jobs_saves_features_and_skips_failures(db_session):
         db_session.commit()
 
 
+def test_embed_jobs_and_cv_similarity(db_session):
+    """pgvector'da kosinüs benzerliği; yalnızca bu testin ilanları (job_ids) işlenir."""
+    import numpy as np
+    from sqlalchemy import delete, select
+
+    from flyhire.db.models import EMBEDDING_DIM, Job, JobFeatures
+    from flyhire.extract.embed import embed_jobs, update_similarity
+    from flyhire.ingest.store import save_jobs
+
+    class AxisEmbedder:
+        """İlan metnindeki etikete göre sabit eksen vektörü."""
+
+        def encode(self, texts):
+            rows = np.zeros((len(texts), EMBEDDING_DIM))
+            for i, text in enumerate(texts):
+                rows[i, 0 if "emb-near" in text else 1] = 1.0
+            return rows
+
+    fetched = [_job(title="Emb near", text="emb-near"), _job(title="Emb far", text="emb-far")]
+    hashes = [j.content_hash for j in fetched]
+    save_jobs(db_session, fetched)
+    jobs = [db_session.scalar(select(Job).where(Job.content_hash == h)) for h in hashes]
+    ids = [job.id for job in jobs]
+    for job in jobs:
+        db_session.add(JobFeatures(job_id=job.id, data={}, llm_model="test"))
+    db_session.commit()
+    try:
+        assert embed_jobs(db_session, AxisEmbedder(), job_ids=ids) == 2
+        assert embed_jobs(db_session, AxisEmbedder(), job_ids=ids) == 0  # zaten var
+        cv = np.zeros(EMBEDDING_DIM)
+        cv[0], cv[1] = 0.6, 0.8  # near ile 0.6, far ile 0.8 benzerlik
+        assert update_similarity(db_session, cv, job_ids=ids) == 2
+        scores = [db_session.get(JobFeatures, i).cv_similarity for i in ids]
+        assert scores == pytest.approx([0.6, 0.8])
+    finally:
+        db_session.execute(delete(Job).where(Job.content_hash.in_(hashes)))
+        db_session.commit()
+
+
 def test_default_config_loads():
     config = SourcesConfig.load()
     assert config.boards and config.filters.title_include

@@ -12,7 +12,7 @@ from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, String, Text,
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-EMBEDDING_DIM = 768  # intfloat/multilingual-e5-base
+EMBEDDING_DIM = 1024  # intfloat/multilingual-e5-large
 
 
 class Base(DeclarativeBase):

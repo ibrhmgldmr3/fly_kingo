@@ -215,6 +215,45 @@ def extract(
     typer.echo(features.model_dump_json(indent=2))
 
 
+@app.command()
+def embed(
+    redo: bool = typer.Option(False, help="Tüm ilanların vektörünü yeniden hesapla"),
+    top: int = typer.Option(10, help="En benzer kaç ilan gösterilsin"),
+) -> None:
+    """İlan vektörlerini hesaplar ve CV–ilan benzerliğini `job_features`'a yazar (CPU)."""
+    from sqlalchemy import select
+
+    from flyhire.db.models import Job, JobFeatures
+    from flyhire.db.session import make_session_factory
+    from flyhire.extract.embed import (
+        E5Embedder,
+        embed_document,
+        embed_jobs,
+        read_cv,
+        update_similarity,
+    )
+
+    cv_text, cv_path, example = read_cv()
+    typer.echo(f"CV: {cv_path}" + ("  (sahte CV; gerçek CV için private/cv.md)" if example else ""))
+    embedder = E5Embedder()
+    start = time.perf_counter()
+    with make_session_factory()() as session:
+        done = embed_jobs(session, embedder, redo=redo)
+        typer.echo(f"{done} ilan vektörü hesaplandı ({time.perf_counter() - start:.0f} s)")
+        updated = update_similarity(session, embed_document(embedder, cv_text))
+        typer.echo(f"{updated} ilanın CV benzerliği güncellendi")
+        rows = session.execute(
+            select(JobFeatures.cv_similarity, Job.company, Job.title)
+            .join(Job)
+            .where(JobFeatures.cv_similarity.is_not(None))
+            .order_by(JobFeatures.cv_similarity.desc())
+        ).all()
+    for score, company, title in rows[:top]:
+        typer.echo(f"  {score:.3f}  {company[:16]:<16} {title[:60]}")
+    if len(rows) > top:
+        typer.echo(f"  ... en düşük: {rows[-1][0]:.3f}  {rows[-1][1][:16]:<16} {rows[-1][2][:60]}")
+
+
 review_app = typer.Typer(help="Özellik çıkarımının elle kontrolü", no_args_is_help=True)
 app.add_typer(review_app, name="review")
 
