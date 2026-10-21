@@ -8,7 +8,7 @@ diğerlerini durdurmaz.
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from flyhire.db.models import Job, JobFeatures
@@ -65,6 +65,7 @@ def extract_jobs(
         row.data = features.model_dump(mode="json")
         row.llm_model = model[:100]
         row.prompt_version = PROMPT_VERSION
+        row.extracted_at = func.now()  # server_default yalnızca ilk eklemede çalışır
         session.add(row)
         session.commit()
         result.done += 1

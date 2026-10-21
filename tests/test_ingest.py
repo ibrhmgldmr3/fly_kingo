@@ -1,7 +1,7 @@
 """İlan toplama: HTML temizliği, ATS ayrıştırıcıları, filtreler, tekrar ayıklama (ağsız)."""
 
 import html
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -206,7 +206,7 @@ def test_save_jobs_skips_existing(db_session):
 
 
 def test_extract_jobs_saves_features_and_skips_failures(db_session):
-    from sqlalchemy import delete, select
+    from sqlalchemy import delete, select, update
 
     from flyhire.db.models import Job, JobFeatures
     from flyhire.extract.llm import PROMPT_VERSION
@@ -246,6 +246,17 @@ def test_extract_jobs_saves_features_and_skips_failures(db_session):
         # başarısız ilan bir sonraki koşuda yine bekleyenler arasında, başarılı olan değil
         waiting = {j.id for j in pending_jobs(db_session)}
         assert bad.id in waiting and ok.id not in waiting
+        # yeniden çıkarımda zaman damgası güncellenir (server_default yalnızca ilk eklemede)
+        first = row.extracted_at
+        db_session.execute(
+            update(JobFeatures)
+            .where(JobFeatures.job_id == ok.id)
+            .values(extracted_at=first - timedelta(days=1))
+        )
+        db_session.commit()
+        extract_jobs(db_session, [ok], Client(), "test/model")
+        db_session.refresh(row)
+        assert row.extracted_at > first - timedelta(days=1)
     finally:
         db_session.execute(delete(Job).where(Job.content_hash.in_(hashes)))
         db_session.commit()
