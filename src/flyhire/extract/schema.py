@@ -4,11 +4,16 @@ LLM yalnızca ilan metnini görür ve bu şemaya uyan bir yanıt üretir. Şema 
 CV ile karşılaştırma, puanlama ve tat kanallarına çeviri sonraki katmanlarda (embedding, kodlayıcı)
 ayrı ve ölçülebilir adımlarla yapılır.
 
-Kırmızı bayrak alıntıları ilan metninde birebir geçmek zorundadır. Doğrulama, Pydantic'in
-`context={"text": ...}` girdisiyle yapılır: alıntı metinde yoksa doğrulama hatası oluşur ve
-Instructor LLM'den düzeltmesini ister. Context verilmezse (örneğin veritabanından okurken)
-kontrol atlanır. Deneyim yılı da bir alıntıya dayanmak zorundadır; dayanmıyorsa hata yerine null
-yapılır (bkz. `JobFeatures.years_need_quote`).
+Her iddia ilandan bir alıntıya dayanır. Alıntılar Pydantic'in `context={"text": ...}` girdisiyle
+ilan metninde aranır (context yoksa, örneğin veritabanından okurken, kontrol atlanır):
+
+- kırmızı bayrak: alıntı ilanda yoksa doğrulama hatası, Instructor LLM'den düzeltmesini ister;
+- gereksinim (zorunlu / tercih): alıntısı ilanda olmayan madde atılır;
+- deneyim yılı ve esnek saat: alıntı değeri desteklemiyorsa değer null / False yapılır.
+
+Son ikisinde hata yerine düzeltme seçildi: modeller bu alanlarda yeniden denemede de ısrar ediyor
+ve hata verilse ilanın tamamı kaybolurdu. Kurallar elle kontrol sonuçlarına göre konuldu
+(`flyhire review`, docs/ROADMAP.md Faz 2).
 """
 
 import re
@@ -16,17 +21,28 @@ from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
+from pydantic.json_schema import SkipJsonSchema
 
-# Deneyim alıntısı kontrolü: 0'dan büyük yıl sayısı alıntıda yazmalı; 0 ise alıntı yeni mezun /
-# deneyimsiz adayı kabul ettiğini söylemeli.
+# 0'dan büyük yıl sayısı alıntıda yazmalı. Türkçe "bir" ve "on" bilerek yok: İngilizce "on" ve
+# Türkçe "bir ekip" gibi ifadelerle karışıyor.
 _NUMBER = re.compile(
-    r"\d|\b(one|two|three|four|five|six|seven|eight|nine|ten|bir|iki|üç|dört|beş|altı|yedi|"
-    r"sekiz|dokuz|on)\b",
+    r"\d|\b(one|two|three|four|five|six|seven|eight|nine|ten|iki|üç|dört|beş|altı|yedi|sekiz|"
+    r"dokuz)\b",
     re.IGNORECASE,
 )
+# 0 yıl: alıntı yeni mezun / deneyimsiz adayı kabul ettiğini söylemeli.
 _NO_EXPERIENCE = re.compile(
     r"graduate|mezun|entry[- ]level|no (prior )?experience|without (prior )?experience|"
     r"deneyimsiz|deneyim (şartı )?aranmaz|tecrübe (şartı )?aranmaz|\b0\b",
+    re.IGNORECASE,
+)
+# Esnek çalışma *saati*. Uzaktan çalışma, "flexible paid time off", "Flexible Work" ve "flexible
+# working model" esnek saat değildir (kullanıcı kararı, 2. tur öncesi). Kendi saatini yönetmek ve
+# async-first çalışma esnek saattir (2. tur kontrol). Testlerde sabit.
+_FLEXIBLE_HOURS = re.compile(
+    r"flexib\w* (working |work )?(hours|schedule|start)|flexi-?time|flex-?time|"
+    r"esnek (çalışma )?(saat|mesai)|manage your (own )?(time|schedule|hours)|"
+    r"async(hronous)?[- ]first|operate asynchronously|work(s|ing)? asynchronously",
     re.IGNORECASE,
 )
 _QUOTE_CHARS = str.maketrans({"“": '"', "”": '"', "„": '"', "‘": "'", "’": "'", "`": "'"})
@@ -35,6 +51,12 @@ _QUOTE_CHARS = str.maketrans({"“": '"', "”": '"', "„": '"', "‘": "'", "�
 def normalize_text(text: str) -> str:
     """Alıntı karşılaştırması için: tırnak, boşluk ve büyük/küçük harf farklarını yok sayar."""
     return re.sub(r"\s+", " ", text.translate(_QUOTE_CHARS)).strip().casefold()
+
+
+def _in_posting(quote: str, info: ValidationInfo) -> bool:
+    """Alıntı ilanda geçiyor mu? Context yoksa (veritabanından okuma) kontrol yapılmaz."""
+    text = (info.context or {}).get("text")
+    return text is None or normalize_text(quote) in normalize_text(text)
 
 
 class JobPosting(BaseModel):
@@ -61,16 +83,6 @@ class JobPosting(BaseModel):
         return "\n".join([*header, "", self.text]) if header else self.text
 
 
-def _check_quote(quote: str, info: ValidationInfo, fallback: str) -> str:
-    text = (info.context or {}).get("text")
-    if text is not None and normalize_text(quote) not in normalize_text(text):
-        raise ValueError(
-            f"Quote {quote!r} does not appear in the posting. Copy the phrase exactly as it is "
-            f"written in the posting, {fallback}."
-        )
-    return quote
-
-
 class Seniority(StrEnum):
     INTERN = "intern"
     JUNIOR = "junior"
@@ -88,14 +100,18 @@ class WorkMode(StrEnum):
 
 
 class RedFlagKind(StrEnum):
-    """Proje dokümanı §8'deki kırmızı bayrak sözlüğünün kategorileri."""
+    """Proje dokümanı §8'deki sözlük, elle kontrolde eklenen kategorilerle (on-call ve sonrası)."""
 
     FAMILY_ENVIRONMENT = "family_environment"  # "aile ortamı"
     HIGH_STRESS = "high_stress"  # "dinamik ve stres toleransı yüksek"
     JUNIOR_WITH_SENIOR_EXPERIENCE = "junior_with_senior_experience"  # "junior, 5+ yıl deneyim"
-    VAGUE_SALARY = "vague_salary"  # "rekabetçi maaş" (rakam yok)
+    # "rekabetçi maaş" (rakam yok) bilerek yok: maaş yazmayan ilan çok yaygın, ayırt edici değil;
+    # bunu `salary` alanının boş olması zaten gösteriyor (2. tur kontrol kararı).
     FLEXIBLE_BUT_OVERTIME = "flexible_but_overtime"  # "esnek saat" + "gerektiğinde fazla mesai"
     UNICORN_ROLE = "unicorn_role"  # "her şeyi yapabilen full stack rockstar ninja"
+    ON_CALL = "on_call"  # zorunlu nöbet / on-call rotasyonu
+    MANDATORY_TRAVEL = "mandatory_travel"  # zorunlu, düzenli seyahat
+    INTRUSIVE_APPLICATION = "intrusive_application"  # lise notları, sınav puanları gibi talepler
     OTHER = "other"
 
 
@@ -106,6 +122,19 @@ class Salary(BaseModel):
     period: Literal["hour", "month", "year"] | None = None
 
 
+class Requirement(BaseModel):
+    """Bir gereksinim. "Go veya C++" ya da "PyTorch gibi" seçenekleri tek maddedir: biri yeter."""
+
+    any_of: list[str] = Field(
+        min_length=1,
+        description=(
+            "Short names of the accepted alternatives; one is enough ('Go or C++' -> ['Go', "
+            "'C++']). A single item when there is no alternative."
+        ),
+    )
+    quote: str = Field(description="The exact phrase from the posting that states this")
+
+
 class RedFlag(BaseModel):
     kind: RedFlagKind
     quote: str = Field(
@@ -114,31 +143,38 @@ class RedFlag(BaseModel):
             "character in the posting's own language. Keep it short (a few words to one sentence)."
         )
     )
+    # LLM'e gösterilmez (şemada yok); kural tabanlı bayraklar "rule" olarak işaretlenir.
+    source: SkipJsonSchema[Literal["llm", "rule"]] = "llm"
 
     @field_validator("quote")
     @classmethod
     def quote_must_appear_in_posting(cls, quote: str, info: ValidationInfo) -> str:
-        return _check_quote(quote, info, "or drop this red flag")
+        if not _in_posting(quote, info):
+            raise ValueError(
+                f"Quote {quote!r} does not appear in the posting. Copy the phrase exactly as it "
+                "is written in the posting, or drop this red flag."
+            )
+        return quote
 
 
 class JobFeatures(BaseModel):
     """İlanın yapılandırılmış özeti. Yalnızca ilanda açıkça yazanlar; tahmin yok."""
 
     language: Literal["tr", "en", "other"] = Field(description="Main language of the posting")
-    required_skills: list[str] = Field(
-        description="Skills, tools or qualifications the posting states as required",
+    required: list[Requirement] = Field(
+        description=(
+            "Every requirement the posting states as mandatory: skills, tools, degrees, spoken "
+            "languages, domain experience. Not responsibilities or tasks of the role."
+        ),
     )
-    preferred_skills: list[str] = Field(
-        description="Skills stated as a plus, nice to have, or preferred",
+    preferred: list[Requirement] = Field(
+        description="Requirements stated as a plus, nice to have, preferred or a strong signal",
     )
-    # Sayı ancak ilandan alıntılanan bir ifadeye dayanıyorsa kabul edilir (modeller boşluğu 0 ile
-    # doldurmaya eğilimli; bkz. `years_need_quote`).
     experience_quote: str | None = Field(
         None,
         description=(
             "Exact phrase from the posting that states the required years of experience, or that "
-            "says new graduates or candidates without experience are welcome. null if the posting "
-            "says neither."
+            "says new graduates or candidates without experience are welcome. null if neither."
         ),
     )
     min_years_experience: float | None = Field(
@@ -152,14 +188,27 @@ class JobFeatures(BaseModel):
         description="Level as stated or clearly implied by the title; unspecified otherwise"
     )
     work_mode: WorkMode
-    location: str | None = Field(None, description="Work location as written; null if absent")
+    locations: list[str] = Field(
+        description=(
+            "Every work location in the posting or its Location header, as written, including "
+            "remote scopes such as 'Home based - Worldwide' or 'Remote, EMEA'. Empty if none."
+        ),
+    )
     salary: Salary | None = Field(
         None, description="Only when the posting gives at least one number; null otherwise"
     )
-    flexible_hours: bool = Field(
-        description="True only if the posting explicitly mentions flexible working hours"
+    flexible_hours_quote: str | None = Field(
+        None,
+        description=(
+            "Exact phrase that offers flexible working hours or schedule, including managing your "
+            "own time or async-first work. Remote work, hybrid work, 'flexible work' without hours "
+            "or flexible time off are not flexible hours. null if absent."
+        ),
     )
-    # Varsayılan değer yok: alan isteğe bağlı olunca bazı modeller onu hiç doldurmuyor.
+    flexible_hours: bool = Field(description="True only when flexible_hours_quote is given")
+    # Varsayılan değer yok: alan isteğe bağlı olunca bazı modeller onu hiç doldurmuyor. Sonda
+    # duruyor: diğer alanlar doldurulduktan sonra üretilince bayrakları daha iyi buluyordu
+    # (Llama 3.3, örnek ilanlarda ölçüldü).
     red_flags: list[RedFlag] = Field(
         description=(
             "Phrases that signal poor working conditions, each with an exact quote. "
@@ -167,29 +216,47 @@ class JobFeatures(BaseModel):
         ),
     )
 
-    @field_validator("experience_quote")
+    @field_validator("required", "preferred")
     @classmethod
-    def experience_quote_must_appear(cls, quote: str | None, info: ValidationInfo) -> str | None:
-        """Boş veya ilanda geçmeyen alıntı yok sayılır (o zaman yıl da desteksiz kalır)."""
-        if not quote or not quote.strip():
-            return None
-        text = (info.context or {}).get("text")
-        if text is not None and normalize_text(quote) not in normalize_text(text):
+    def drop_unquoted_requirements(
+        cls, items: list[Requirement], info: ValidationInfo
+    ) -> list[Requirement]:
+        """Alıntısı ilanda geçmeyen gereksinim atılır (uydurulmuş beceri); tekrarlar birleşir."""
+        kept, seen = [], set()
+        for item in items:
+            by_key = {}
+            for name in (n.strip() for n in item.any_of):
+                if name:
+                    by_key.setdefault(name.casefold(), name)
+            names, key = list(by_key.values()), frozenset(by_key)
+            if names and key not in seen and _in_posting(item.quote, info):
+                seen.add(key)
+                kept.append(item.model_copy(update={"any_of": names}))
+        return kept
+
+    @field_validator("experience_quote", "flexible_hours_quote")
+    @classmethod
+    def quote_or_none(cls, quote: str | None, info: ValidationInfo) -> str | None:
+        """Boş veya ilanda geçmeyen alıntı yok sayılır (o zaman değer de desteksiz kalır)."""
+        if not quote or not quote.strip() or not _in_posting(quote, info):
             return None
         return quote
 
     @model_validator(mode="after")
-    def years_need_quote(self) -> "JobFeatures":
-        """Alıntıyla desteklenmeyen yıl sayısı null yapılır.
-
-        Hata yerine düzeltme: modeller (ör. Llama 3.3) "yıl yazmıyor" durumunda ısrarla 0 verip
-        yeniden denemede de değiştirmiyor; hata verilse ilanın tamamı kaybolurdu. Kural: > 0 yıl
-        alıntıda bir sayıyla, 0 yıl alıntıda yeni mezun / deneyimsiz kabulüyle desteklenmeli.
-        """
+    def values_need_support(self) -> "JobFeatures":
+        """Alıntıyla desteklenmeyen değerler düzeltilir (bkz. modül açıklaması)."""
         years, quote = self.min_years_experience, self.experience_quote or ""
         supported = years is not None and (
             (years > 0 and _NUMBER.search(quote)) or (years == 0 and _NO_EXPERIENCE.search(quote))
         )
         if not supported:
             self.min_years_experience = None
+
+        flex = self.flexible_hours_quote or ""
+        self.flexible_hours = bool(_FLEXIBLE_HOURS.search(flex))
+        if not self.flexible_hours:
+            self.flexible_hours_quote = None
+
+        if self.salary and not any(v and v > 0 for v in (self.salary.min, self.salary.max)):
+            self.salary = None
         return self

@@ -175,7 +175,9 @@ def extract(
     ),
     db: bool = typer.Option(False, "--db", help="Veritabanındaki özelliği olmayan ilanları işle"),
     limit: int | None = typer.Option(None, help="--db: en fazla bu kadar ilan"),
-    redo: bool = typer.Option(False, help="--db: eski istem sürümüyle çıkarılanları yenile"),
+    redo: bool = typer.Option(
+        False, help="--db: başka istem sürümü veya modelle çıkarılanları yenile"
+    ),
     title: str | None = typer.Option(None),
     company: str | None = typer.Option(None),
     location: str | None = typer.Option(None),
@@ -198,7 +200,7 @@ def extract(
             typer.echo(f"#{job.id:<5} {job.company[:16]:<16} {job.title[:44]:<44} {status}")
 
         with make_session_factory()() as session:
-            jobs = pending_jobs(session, redo=redo, limit=limit)
+            jobs = pending_jobs(session, redo=redo, limit=limit, model=model)
             typer.echo(f"{len(jobs)} ilan bekliyor")
             result = extract_jobs(session, jobs, make_client(model), model, progress=progress)
         typer.echo(f"{result.done} ilan işlendi, {len(result.failed)} hata ({model})")

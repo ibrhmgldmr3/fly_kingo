@@ -22,14 +22,15 @@ RED_FLAGS_TEXT = (POSTINGS / "tr_red_flags.txt").read_text(encoding="utf-8")
 def _features(**overrides) -> dict:
     data = {
         "language": "tr",
-        "required_skills": ["SQL"],
-        "preferred_skills": [],
+        "required": [{"any_of": ["SQL", "Excel"], "quote": "İleri düzeyde SQL ve Excel bilgisi"}],
+        "preferred": [],
         "experience_quote": "En az 5 yıl veri analizi deneyimi",
         "min_years_experience": 5,
         "seniority": "junior",
         "work_mode": "onsite",
-        "location": "İstanbul",
+        "locations": ["İstanbul, Maslak"],
         "salary": None,
+        "flexible_hours_quote": "Esnek çalışma saatleri",
         "flexible_hours": True,
         "red_flags": [],
     }
@@ -82,6 +83,150 @@ def test_years_must_be_supported_by_quote(quote, years, kept):
     assert features.min_years_experience == (years if kept else None)
 
 
+def test_years_quote_with_english_on_is_not_a_number():
+    """Elle kontrol #29: "depended on" içindeki "on" Türkçe 10 sanılmıştı."""
+    text = "Have shipped production LLM agent systems that other people depended on"
+    features = JobFeatures.model_validate(
+        _features(experience_quote=text, min_years_experience=2), context={"text": text}
+    )
+    assert features.min_years_experience is None
+
+
+def test_unquoted_requirements_are_dropped():
+    """Elle kontrol #13: ilanda geçmeyen "pytest" zorunlu beceri olarak yazılmıştı."""
+    required = [
+        {"any_of": ["SQL"], "quote": "İleri düzeyde SQL ve Excel bilgisi"},
+        {"any_of": ["pytest"], "quote": "pytest deneyimi"},
+    ]
+    features = JobFeatures.model_validate(
+        _features(required=required), context={"text": RED_FLAGS_TEXT}
+    )
+    assert [r.any_of for r in features.required] == [["SQL"]]
+
+
+def test_duplicate_requirements_are_merged():
+    """DeepSeek denemesi: "Python; Python", "Linux; Linux"."""
+    quote = "İleri düzeyde SQL ve Excel bilgisi"
+    required = [
+        {"any_of": ["SQL", "Excel", "sql"], "quote": quote},
+        {"any_of": ["excel", "sql"], "quote": quote},
+        {"any_of": [" ", "Excel"], "quote": quote},
+    ]
+    features = JobFeatures.model_validate(_features(required=required))
+    assert [r.any_of for r in features.required] == [["SQL", "Excel"], ["Excel"]]
+
+
+@pytest.mark.parametrize(
+    ("quote", "expected"),
+    [
+        ("Esnek çalışma saatleri", True),
+        ("flexible working hours", True),
+        ("Flexible Paid Time Off", False),  # elle kontrol #12: esnek izin
+        ("Fully remote role", False),  # elle kontrol #2: uzaktan çalışma
+        # kullanıcı kararı (21 Ekim 2026): yalnızca açıkça esnek saat/program sayılır
+        ("Flexible Work", False),  # Supabase
+        ("our flexible working model called iyzico Homequarters", False),  # iyzico
+        ("flexible schedule", True),
+        # 2. tur kontrol (21 Ekim 2026): kendi saatini yönetmek ve async-first esnek saattir
+        ("We operate asynchronously and trust you to manage your own time.", True),  # Supabase
+        ("Our engineers work async-first across EMEA and AMER timezones", True),  # GitLab
+        (None, False),
+    ],
+)
+def test_flexible_hours_follow_the_quote(quote, expected):
+    text = (
+        f"{RED_FLAGS_TEXT}\nflexible working hours\nFlexible Paid Time Off\nFully remote role\n"
+        "Flexible Work\nour flexible working model called iyzico Homequarters\nflexible schedule\n"
+        "We operate asynchronously and trust you to manage your own time.\n"
+        "Our engineers work async-first across EMEA and AMER timezones"
+    )
+    features = JobFeatures.model_validate(
+        _features(flexible_hours_quote=quote, flexible_hours=True), context={"text": text}
+    )
+    assert features.flexible_hours is expected
+    assert (features.flexible_hours_quote is not None) is expected
+
+
+@pytest.mark.parametrize("salary", [{"min": 0, "max": 0}, {"min": None, "max": None}])
+def test_salary_without_numbers_is_none(salary):
+    """Elle kontrol #24/#25/#31: maaş yazmayan ilanda "0 - 0" çıkmıştı."""
+    assert JobFeatures.model_validate(_features(salary=salary)).salary is None
+
+
+def test_rule_flags_are_added_once_and_marked():
+    from flyhire.extract.rules import apply_rules
+
+    flags = apply_rules(JobFeatures.model_validate(_features())).red_flags
+    assert [(f.kind.value, f.source, f.quote) for f in flags] == [
+        ("junior_with_senior_experience", "rule", "En az 5 yıl veri analizi deneyimi"),
+    ]
+    llm_flag = {"kind": "junior_with_senior_experience", "quote": "Junior Veri Analisti"}
+    flags = apply_rules(JobFeatures.model_validate(_features(red_flags=[llm_flag]))).red_flags
+    assert [f.source for f in flags] == ["llm"]  # LLM zaten buldu: tekrar eklenmez
+
+
+def test_rule_flags_need_their_conditions():
+    from flyhire.extract.rules import rule_flags
+
+    assert rule_flags(JobFeatures.model_validate(_features(seniority="mid"))) == []
+
+
+def test_vague_salary_is_not_a_red_flag():
+    """2. tur kontrol kararı: maaş yazmamak ayırt edici değil, `salary` alanı bunu gösteriyor."""
+    with pytest.raises(ValidationError):
+        JobFeatures.model_validate(
+            _features(red_flags=[{"kind": "vague_salary", "quote": "Rekabetçi maaş"}])
+        )
+
+
+def _req(*names, quote="x"):
+    return {"any_of": list(names), "quote": quote}
+
+
+@pytest.mark.parametrize(
+    ("names", "soft"),
+    [
+        (["Written and verbal communication"], True),
+        (["Proactive", "Self-motivated", "Organized"], True),
+        (["Openness to learning"], True),
+        (["Analytical thinking", "Problem-solving"], True),
+        (["English"], False),  # dil gereksinimi kalır
+        (["Python"], False),
+        (["Communication", "SQL"], False),  # bir alternatif teknik: kalır
+    ],
+)
+def test_soft_skills_are_detected(names, soft):
+    from flyhire.extract.rules import is_soft_skill
+    from flyhire.extract.schema import Requirement
+
+    assert is_soft_skill(Requirement.model_validate(_req(*names))) is soft
+
+
+def test_requirements_covered_by_red_flags_are_dropped():
+    """2. tur kontrol: seyahat ve akademik geçmiş yalnızca bayrakta kalsın."""
+    from flyhire.extract.rules import apply_rules
+
+    features = JobFeatures.model_validate(
+        _features(
+            required=[
+                _req("Python", quote="Python"),
+                _req("Travel", quote="Ability to travel twice a year"),
+                _req("Exceptional academic track record", quote="track record from high school"),
+                _req("Communication skills", quote="Excellent communication"),
+            ],
+            red_flags=[
+                {"kind": "mandatory_travel", "quote": "travel internationally twice a year"},
+                {"kind": "intrusive_application", "quote": "academic track record"},
+            ],
+        )
+    )
+    assert [r.any_of for r in apply_rules(features).required] == [["Python"]]
+
+
+def test_source_is_hidden_from_llm_schema():
+    assert "source" not in str(JobFeatures.model_json_schema())
+
+
 def test_quote_check_skipped_without_context():
     """Veritabanından okurken ilan metni verilmez; kayıtlı alıntılar yeniden denetlenmez."""
     flags = [{"kind": "other", "quote": "metinde olmayan"}]
@@ -109,7 +254,12 @@ def test_extract_features_sends_only_the_posting_and_quote_context():
     client = FakeClient(expected)
     posting = JobPosting(text=RED_FLAGS_TEXT, title="Junior Veri Analisti")
 
-    assert extract_features(posting, client=client) is expected
+    result = extract_features(posting, client=client)
+    assert result.required == expected.required
+    # kural bayrağı: junior + 5 yıl
+    assert {(f.kind, f.source) for f in result.red_flags} == {
+        (RedFlagKind.JUNIOR_WITH_SENIOR_EXPERIENCE, "rule"),
+    }
     (call,) = client.calls
     assert call["response_model"] is JobFeatures
     assert call["context"] == {"text": posting.full_text}
@@ -178,8 +328,13 @@ def test_live_turkish_red_flags(live_client):
     assert {
         RedFlagKind.FAMILY_ENVIRONMENT,
         RedFlagKind.HIGH_STRESS,
-        RedFlagKind.VAGUE_SALARY,
+        RedFlagKind.JUNIOR_WITH_SENIOR_EXPERIENCE,
     } <= kinds
+    # "Power BI veya Tableau deneyimi": tek gereksinim, iki seçenek; Python tercih sebebi
+    bi = [set(r.any_of) for r in f.required if {"Power BI", "Tableau"} & set(r.any_of)]
+    assert bi == [{"Power BI", "Tableau"}]
+    assert any("Python" in r.any_of for r in f.preferred)
+    assert not any("Python" in r.any_of for r in f.required)
 
 
 @pytest.mark.llm
@@ -215,7 +370,10 @@ def test_review_values_are_readable():
     assert _value(data, "experience") == "5 yıl: “En az 5 yıl veri analizi deneyimi”"
     assert _value(data, "salary") == "60,000 - 80,000 TRY / month"
     assert _value(data, "red_flags") == "family_environment: “aile ortamı”"
-    assert _value(data, "preferred_skills") == "(yok)"
+    assert _value(data, "required") == "SQL veya Excel"
+    assert _value(data, "preferred") == "(yok)"
+    assert _value(data, "locations") == "İstanbul, Maslak"
+    assert _value(data, "flexible_hours") == "True: “Esnek çalışma saatleri”"
     assert _value(_features(min_years_experience=None), "experience") == "(yazmıyor)"
 
 

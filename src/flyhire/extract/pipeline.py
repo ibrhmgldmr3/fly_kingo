@@ -22,16 +22,18 @@ class ExtractResult:
     failed: dict[int, str] = field(default_factory=dict)  # job_id -> hata
 
 
-def pending_jobs(session: Session, redo: bool = False, limit: int | None = None) -> list[Job]:
-    """Özelliği olmayan ilanlar; `redo` ile güncel istemden farklı sürümle çıkarılanlar da."""
+def pending_jobs(
+    session: Session, redo: bool = False, limit: int | None = None, model: str | None = None
+) -> list[Job]:
+    """Özelliği olmayan ilanlar; `redo` ile güncel istemden (veya `model`'den) farklı
+    sürümle çıkarılanlar da."""
     query = select(Job).outerjoin(JobFeatures).order_by(Job.id)
     condition = JobFeatures.job_id.is_(None)
     if redo:
-        condition = or_(
-            condition,
-            JobFeatures.prompt_version.is_(None),
-            JobFeatures.prompt_version != PROMPT_VERSION,
-        )
+        stale = [JobFeatures.prompt_version.is_(None), JobFeatures.prompt_version != PROMPT_VERSION]
+        if model:
+            stale.append(JobFeatures.llm_model != model[:100])
+        condition = or_(condition, *stale)
     return list(session.scalars(query.where(condition).limit(limit)))
 
 

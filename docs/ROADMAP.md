@@ -80,7 +80,7 @@ fly_kingo/
 ### Faz 0: Kurulum · 2–3 gün
 - Conda ortamı: `conda create -n fly_kingo python=3.12 -y` (karşılığı `environment.yml`: `name: fly_kingo`, `python=3.12`, `pip`, numpy, scipy). Ardından `conda activate fly_kingo` ve `pip install -e ".[dev]"`. PyTorch CPU sürümü `--index-url https://download.pytorch.org/whl/cpu` ile kurulur.
 - `pyproject.toml` (src layout, `flyhire` paketi, `[project.scripts] flyhire = ...` CLI), klasör yapısı, ruff/pytest/pre-commit, git init, GitHub reposu (`flyhire` / `proboscis-extension-recruiting`).
-- `docker-compose.yml` ile Postgres+pgvector (port **5433**; 5432 makinedeki yerel PostgreSQL servisinde). Alembic ilk migration (jobs, features, decisions, applications, labels).
+- `docker-compose.yml` ile Postgres+pgvector (port **5434**; 5432 makinedeki yerel PostgreSQL servisinde, 5433 başka bir projenin konteynerinde). Alembic ilk migration (jobs, features, decisions, applications, labels).
 - `flyhire data download`: FlyWire v783 (Shiu reposundaki işaretli bağlantılar) + annotations. ✅
 - Shiu reposunun ve FlyWire verisinin lisansını kontrol et, `docs/LICENSES.md`'ye yaz.
 - **Bitti tanımı:** `conda activate fly_kingo` sonrası `python --version` 3.12, `pytest` yeşil, `docker compose up` ile DB ayakta, veri iniyor.
@@ -103,7 +103,9 @@ Ayrıntılı sonuçlar: [BRAIN_VALIDATION.md](BRAIN_VALIDATION.md).
   - ✅ PostgreSQL'e yazma: 32 ilan yazıldı, ikinci koşuda 32'si "zaten vardı" (tekrar ayıklama çalışıyor).
 - `JobFeatures` Pydantic şeması (doküman §4.2), Instructor ile çıkarım, 20 ilanda elle kontrol.
   - ✅ Şema ve çıkarım: `src/flyhire/extract/`, `flyhire extract ilan.txt`. Kırmızı bayrak alıntıları ilanda birebir geçmek zorunda (geçmezse LLM'den düzeltmesi istenir). Gerçek LLM testleri `pytest -m llm` (API anahtarı ister).
-  - ⏳ 20 ilanda elle kontrol.
+  - ✅ 20 ilanda elle kontrol, 1. tur (`flyhire review`, features-v2, Llama 3.3 70B): alan bazında doğruluk %72 (zorunlu beceri %30, esnek saat %50, kırmızı bayrak %55, seviye ve çalışma şekli %100). Bulunan hata türlerine göre features-v4: gereksinimler alternatifleriyle tek madde ve alıntılı (`any_of`), lokasyon listesi, esnek saat ve deneyim yılı alıntıyla desteklenmezse düzeltiliyor, yeni bayraklar (on-call, zorunlu seyahat, lise notu talebi), rakamsız maaş ve "junior + çok yıl" kuralla (`extract/rules.py`). Model DeepSeek V4.1 Flash'a geçti: Llama 3.3 Türkçe gereksinimleri tutarsız çıkarıyordu.
+  - ✅ 2. tur kontrol (features-v4, DeepSeek V4.1 Flash): toplam %81 (1. tur %72); tercih %95, maaş ve deneyim %100, kırmızı bayrak %85, esnek saat %70, lokasyon %75. Zorunlu beceri %5'e düştü: listeler eksiksizleşti ama kişisel beceriler, "ve"nin "veya" yazılması ve bayraklarla tekrar yüzünden. Kararlar ve features-v5: kişisel beceriler ve bayrakla çakışan gereksinimler kuralla atılır (`extract/rules.py`); "ve" ayrı madde, "such as" genel kategori + örnek; async-first ve "kendi saatini yönet" esnek saat, "Flexible Work"/esnek izin değil; rakamsız maaş artık bayrak değil (maaş yazmamak yaygın, `salary` alanı gösteriyor); avantaj olarak anlatılan şirket buluşması seyahat bayrağı değil.
+  - v5 öz-kontrolü (2. turun 50 yanlış satırı, kontrol eden: Claude, insan değil): esnek saat 6/6, bayrak 3/3, zorunlu beceri ~15/19, lokasyon 2/5 düzeldi. Kalanlar: çok şehirli lokasyonlar eksik, bir ilanda (#32) somut araçlar genel başlıklara indirgendi. Bilinen sınır: başvuru formunda olup ilan metninde olmayan bilgi (formdaki ülke sorusu) çıkarılamaz. İstem ayarına burada ara verildi; Faz 3 etiketleri hangi hataların karara etkidiğini gösterecek.
 - CV ve ilan embedding'leri pgvector'a, kosinüs benzerliği. (Repoya **sahte CV**. Gerçek CV yalnızca yerelde.)
 - APScheduler günlük toplama.
 - **Bitti tanımı:** tablo her gün otomatik doluyor, özellikler ve benzerlik skorları hesaplanmış.

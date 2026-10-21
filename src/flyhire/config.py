@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    database_url: str = "postgresql+psycopg://flyhire:flyhire@localhost:5433/flyhire"
+    database_url: str = "postgresql+psycopg://flyhire:flyhire@localhost:5434/flyhire"
     data_dir: Path = Path("data")
 
     llm_model: str = "anthropic/claude-sonnet-5-5"

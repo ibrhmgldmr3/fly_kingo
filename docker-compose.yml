@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: flyhire
       POSTGRES_DB: flyhire
     ports:
-      - "5433:5432"
+      - "5434:5432"
     volumes:
       - flyhire_pg:/var/lib/postgresql/data
     healthcheck:

@@ -21,19 +21,31 @@ from flyhire.db.models import Job, JobFeatures
 
 COLUMNS = ["job_id", "sirket", "baslik", "url", "alan", "deger", "dogru", "not"]
 FIELDS = [
-    "required_skills",
-    "preferred_skills",
+    "required",
+    "preferred",
     "experience",
     "seniority",
     "work_mode",
-    "location",
+    "locations",
     "salary",
     "flexible_hours",
     "red_flags",
 ]
+# features-v2 ve öncesinin alan adları (eski kontrol dosyaları da puanlanabilsin)
+OLD_FIELDS = {
+    "required_skills": "required",
+    "preferred_skills": "preferred",
+    "location": "locations",
+}
 
 
 def _value(data: dict, name: str) -> str:
+    if name in {"required", "preferred"}:
+        items = data.get(name) or []
+        return "; ".join(" veya ".join(item["any_of"]) for item in items) or "(yok)"
+    if name == "flexible_hours":
+        quote = data.get("flexible_hours_quote")
+        return f"True: “{quote}”" if data.get("flexible_hours") else "False"
     if name == "experience":
         years = data.get("min_years_experience")
         quote = data.get("experience_quote")
@@ -101,10 +113,11 @@ def score_review(path: Path) -> ReviewScore:
         delimiter = ";" if sample.count(";") >= sample.count(",") else ","
         for row in csv.DictReader(f, delimiter=delimiter):
             mark = (row.get("dogru") or "").strip().casefold()
+            field = OLD_FIELDS.get(row["alan"], row["alan"])
             if mark in {"e", "evet", "d", "doğru", "dogru", "1", "yes"}:
-                correct[row["alan"]] += 1
+                correct[field] += 1
             elif mark in {"h", "hayır", "hayir", "y", "yanlış", "yanlis", "0", "n", "no"}:
-                wrong[row["alan"]] += 1
+                wrong[field] += 1
             else:
                 unmarked += 1
     return ReviewScore(correct, wrong, unmarked)

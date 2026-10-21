@@ -220,10 +220,11 @@ def test_extract_jobs_saves_features_and_skips_failures(db_session):
     ok, bad = (db_session.scalar(select(Job).where(Job.content_hash == h)) for h in hashes)
     features = Features(
         language="en",
-        required_skills=["SQL"],
-        preferred_skills=[],
+        required=[{"any_of": ["SQL"], "quote": "SQL"}],
+        preferred=[],
         seniority="unspecified",
         work_mode="remote",
+        locations=[],
         flexible_hours=False,
         red_flags=[],
     )
@@ -241,7 +242,7 @@ def test_extract_jobs_saves_features_and_skips_failures(db_session):
         assert list(result.failed) == [bad.id] and "LLM yanıt vermedi" in result.failed[bad.id]
         row = db_session.get(JobFeatures, ok.id)
         assert row.prompt_version == PROMPT_VERSION and row.llm_model == "test/model"
-        assert row.data["required_skills"] == ["SQL"]
+        assert row.data["required"] == [{"any_of": ["SQL"], "quote": "SQL"}]
         # başarısız ilan bir sonraki koşuda yine bekleyenler arasında, başarılı olan değil
         waiting = {j.id for j in pending_jobs(db_session)}
         assert bad.id in waiting and ok.id not in waiting
