@@ -21,6 +21,14 @@ filters:
     - 'bilim'
     - '\bnlp\b'
     - 'computer vision'
+    # yazılım geliştirme (CV: full stack geliştirici, React/Next.js + FastAPI/Node.js)
+    - 'full[- ]?stack'
+    - 'back[- ]?end'
+    - 'front[- ]?end'
+    - 'software (engineer|developer|development)'
+    - 'developer'
+    - 'geliştirici'
+    - 'yazılım (mühendisi|uzmanı)'
   # alan dışı (satış, İK, iletişim); kıdem burada elenmez
   title_exclude:
     - 'account executive'
@@ -29,6 +37,8 @@ filters:
     - 'recruit'
     - 'communications'
     - 'deal desk'
+    - 'business develop'
+    - 'developer (advocate|relations)'
   location_include:
     - 'turkey'
     - 'türkiye'
